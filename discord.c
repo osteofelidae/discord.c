@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <curl/curl.h>
 #include "discord.h"
 
@@ -67,7 +68,7 @@ int make_headers(  // Make header struct from raw strings
 
 }
 
-void req_callback(  // Callback function for requests
+size_t req_callback(  // Callback function for requests
 	char *data,  // Data delivered by request
 	size_t size,
 	size_t nmemb,
@@ -85,122 +86,75 @@ void req_callback(  // Callback function for requests
 			"Request callback: output buffer too small"
 			);
 	}
-}
 
-char *get(  // Send a GET request
-	char *result,  // Variable to store result in
-	char *url,  // URL to send it to
-	struct curl_slist *headers  // Headers
-	) {
-
-	CURL *http = curl_easy_init();  // CURL handle
-	CURLcode curl_result;  // CURL result
-	char err[512];  // Error message  [[TODO make size efficient]]
-
-	curl_easy_setopt(  // Set CURL url
-		http,
-		CURLOPT_URL, 
-		(url) ? (url) : (DISC_BASE_URL)  // If URL provided, set it; otherwise, use base URL
-		);
-
-	curl_easy_setopt(  // Set CURL headers
-		http,
-		CURLOPT_HTTPHEADER,
-		(headers) ? (headers) : (DISC_HEADERS)  // If headers provided, set them; otherwise, use default headers
-		);
-
-	curl_easy_setopt(  // Set callback function
-		http,
-		CURLOPT_WRITEFUNCTION,
-		req_callback
-		);
-
-	curl_easy_setopt(
-		http,
-		CURLOPT_WRITEDATA,
-		result
-		);
-
-	curl_result = curl_easy_perform(http);  // Do request
-
-	if (curl_result != CURLE_OK) {  // If request failed
-
-		sprintf(err,  // Create error message
-			"GET request: request to %s failed\n",
-			url
-			);
-
-		fprintf(  // Print error to stderr
-			stderr,
-			err
-			);
-
-	}
-
-	curl_easy_cleanup(http);
-
-	return result;
+	return size * nmemb;  // Return same size so that CURL knows callback was successful
 
 }
 
-char *post(  // Send a POST request
+char *request(  // Send a request
 	char *result,  // Variable to store result in
+	char *method,  // GET, POST, PUT, DELETE, etc.
 	char *url,  // URL to send it to
 	struct curl_slist *headers,  // Headers
-	char *content  // POST content
+	char *content  // Request content
 	) {
 
-	CURL *http = curl_easy_init();  // CURL handle
+	CURL *curl = curl_easy_init();  // CURL handle
 	CURLcode curl_result;  // CURL result
-	char err[512];  // Error message  [[TODO make size efficient]]
+
+	curl_easy_setopt(  // Specify request type
+		curl,
+		CURLOPT_CUSTOMREQUEST,
+		method
+		);
 
 	curl_easy_setopt(  // Set CURL url
-		http,
+		curl,
 		CURLOPT_URL, 
 		(url) ? (url) : (DISC_BASE_URL)  // If URL provided, set it; otherwise, use base URL
 		);
 
 	curl_easy_setopt(  // Set CURL headers
-		http,
+		curl,
 		CURLOPT_HTTPHEADER,
 		(headers) ? (headers) : (DISC_HEADERS)  // If headers provided, set them; otherwise, use default headers
 		);
 
-	curl_easy_setopt(  // Set POST content
-		http,
-		CURLOPT_POSTFIELDS,
-		content
-		);
+	if (content) {  // If content is provided
+		curl_easy_setopt(  // Set content
+			curl,
+			CURLOPT_POSTFIELDS,
+			content
+			);
+	}
 
 	curl_easy_setopt(  // Set callback function
-		http,
+		curl,
 		CURLOPT_WRITEFUNCTION,
 		req_callback
 		);
 
-	curl_easy_setopt(
-		http,
+	curl_easy_setopt(  // Set callback function parameter
+		curl,
 		CURLOPT_WRITEDATA,
 		result
 		);
 
-	curl_result = curl_easy_perform(http);  // Do request
+	curl_result = curl_easy_perform(curl);  // Do request
 
 	if (curl_result != CURLE_OK) {  // If request failed
 
-		sprintf(err,  // Create error message
-			"POST request: request to %s failed\n",
-			url
-			);
-
 		fprintf(  // Print error to stderr
 			stderr,
-			err
+			"%s request: request to %s failed (%s)\n",
+			method,
+			url,
+			curl_easy_strerror(curl_result)
 			);
 
 	}
 
-	curl_easy_cleanup(http);
+	curl_easy_cleanup(curl);
 
 	return result;
 
@@ -213,13 +167,14 @@ int main() {
 	init();
 	char result[2048];
 
-	get(result, "https://reqres.in/api/users?page=2", NULL);
+	request(result, "GET", "https://reqres.in/api/users?page=2", NULL, NULL);
+	printf("%s\n\n", result);
 
-	printf(result);
+	request(result, "POST", "https://reqres.in/api/users", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
+	printf("%s\n\n", result);
 
-	post(result, "https://reqres.in/api/users", NULL, "{\"name\": \"morpheus\",\"job\": \"leader\"}");
-
-	printf(result);
+	request(result, "PUT", "https://reqres.in/api/users/2", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
+	printf("%s\n\n", result);
 
 	stop();
 

@@ -24,12 +24,26 @@ char *DISC_HEADERS_RAW[N_DISC_HEADERS] = {  // Raw string headers
 struct curl_slist *DISC_HEADERS = NULL;  // Header list
 
 
+// STRUCTS
+struct request {  // Request
+	char *method;  // GET, POST, etc.
+	char *url;  // URL to send the request to
+	struct curl_slist *headers;  // Headers
+	char *content;  // Request content
+};
+
+struct response {  // Response to a request
+	long code;  // Response status code
+	char content[2048];  // Response content
+};
+
+
 // FUNCTIONS
 int init() {  // Initialize bot
 
 	curl_global_init(CURL_GLOBAL_DEFAULT);
 	
-	make_headers(  // Make default headers
+	create_headers(  // Make default headers
 		DISC_HEADERS,
 		DISC_HEADERS_RAW,
 		N_DISC_HEADERS
@@ -51,7 +65,7 @@ int stop() {
 	return 0;
 }
 
-int make_headers(  // Make header struct from raw strings
+int create_headers(  // Make header struct from raw strings
 	struct curl_slist *headers,  // Headers list to add to
 	char *headers_raw[], // Array of string headers
 	int n_headers  // Number of headers in headers_raw
@@ -91,12 +105,26 @@ size_t req_callback(  // Callback function for requests
 
 }
 
-char *request(  // Send a request
-	char *result,  // Variable to store result in
-	char *method,  // GET, POST, PUT, DELETE, etc.
-	char *url,  // URL to send it to
-	struct curl_slist *headers,  // Headers
-	char *content  // Request content
+int *set_req(  // Set request struct
+		struct request *req,
+		char *method,  // GET, POST, etc.
+		char *url,  // Url to send request to
+		struct curl_slist *headers,  // Headers
+		char *content  // Request content
+	) {
+
+	req->method = method;
+	req->url = url;
+	req->headers = headers;
+	req->content = content;
+
+	return 0;
+
+}
+
+struct response *send_req(  // Send a request
+	struct request *req,  // Request data
+	struct response *res  // Struct to store response in
 	) {
 
 	CURL *curl = curl_easy_init();  // CURL handle
@@ -105,26 +133,28 @@ char *request(  // Send a request
 	curl_easy_setopt(  // Specify request type
 		curl,
 		CURLOPT_CUSTOMREQUEST,
-		method
+		req->method
 		);
 
 	curl_easy_setopt(  // Set CURL url
 		curl,
 		CURLOPT_URL, 
-		(url) ? (url) : (DISC_BASE_URL)  // If URL provided, set it; otherwise, use base URL
+		req->url
 		);
 
-	curl_easy_setopt(  // Set CURL headers
-		curl,
-		CURLOPT_HTTPHEADER,
-		(headers) ? (headers) : (DISC_HEADERS)  // If headers provided, set them; otherwise, use default headers
-		);
+	if (req->headers != NULL) {  // If headers are provided
+		curl_easy_setopt(  // Set CURL headers
+			curl,
+			CURLOPT_HTTPHEADER,
+			req->headers
+			);
+	}
 
-	if (content) {  // If content is provided
+	if (req->content != NULL) {  // If content is provided
 		curl_easy_setopt(  // Set content
 			curl,
 			CURLOPT_POSTFIELDS,
-			content
+			req->content
 			);
 	}
 
@@ -137,18 +167,26 @@ char *request(  // Send a request
 	curl_easy_setopt(  // Set callback function parameter
 		curl,
 		CURLOPT_WRITEDATA,
-		result
+		res->content
 		);
 
 	curl_result = curl_easy_perform(curl);  // Do request
 
-	if (curl_result != CURLE_OK) {  // If request failed
+	if (curl_result == CURLE_OK) {  // If request succeed
+
+		curl_easy_getinfo(  // Response code
+			curl,
+			CURLINFO_RESPONSE_CODE,
+			&res->code
+			);
+
+	} else {  // If request failed
 
 		fprintf(  // Print error to stderr
 			stderr,
 			"%s request: request to %s failed (%s)\n",
-			method,
-			url,
+			req->method,
+			req->url,
 			curl_easy_strerror(curl_result)
 			);
 
@@ -156,7 +194,7 @@ char *request(  // Send a request
 
 	curl_easy_cleanup(curl);
 
-	return result;
+	return res;
 
 }
 
@@ -165,16 +203,20 @@ char *request(  // Send a request
 int main() {
 
 	init();
-	char result[2048];
 
-	request(result, "GET", "https://reqres.in/api/users?page=2", NULL, NULL);
-	printf("%s\n\n", result);
+	struct request *imp = malloc(sizeof(struct request));
+	struct response *result = malloc(sizeof(struct response));
 
-	request(result, "POST", "https://reqres.in/api/users", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
-	printf("%s\n\n", result);
+	set_req(imp, "GET", "https://reqres.in/api/users", NULL, NULL);
+	send_req(imp, result);
+	printf("%d %s\n\n", result->code, result->content);
 
-	request(result, "PUT", "https://reqres.in/api/users/2", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
-	printf("%s\n\n", result);
+	set_req(imp, "POST", "https://reqres.in/api/users", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
+	send_req(imp, result);
+	printf("%d %s\n\n", result->code, result->content);
+
+	//send_request(result, "PUT", "https://reqres.in/api/users/2", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
+	//printf("%s\n\n", result);
 
 	stop();
 

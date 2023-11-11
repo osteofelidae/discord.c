@@ -122,7 +122,7 @@ int *set_req(  // Set request struct
 
 }
 
-struct response *send_req(  // Send a request
+int send_req(  // Send a request
 	struct request *req,  // Request data
 	struct response *res  // Struct to store response in
 	) {
@@ -190,11 +190,13 @@ struct response *send_req(  // Send a request
 			curl_easy_strerror(curl_result)
 			);
 
+		return -1;
+
 	}
 
-	curl_easy_cleanup(curl);
+	curl_easy_cleanup(curl);  // Clean up
 
-	return res;
+	return 0;
 
 }
 
@@ -215,8 +217,12 @@ int main() {
 	send_req(imp, result);
 	printf("%d %s\n\n", result->code, result->content);
 
-	//send_request(result, "PUT", "https://reqres.in/api/users/2", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
-	//printf("%s\n\n", result);
+	set_req(imp, "PUT", "https://reqres.in/api/users/2", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
+	send_req(imp, result);
+	printf("%d %s\n\n", result->code, result->content);
+
+	free(imp);
+	free(result);
 
 	stop();
 

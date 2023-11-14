@@ -1,2 +1,2 @@
-all: discord.c
-	gcc -lcurl -Wall discord.c
+all: test.c discord.c
+	gcc -lcurl -Wall test.c discord.c

@@ -4,7 +4,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <curl/curl.h>
-#include "discord.h"
 
 
 // GLOBALS
@@ -24,47 +23,37 @@ char *DISC_HEADERS_RAW[N_DISC_HEADERS] = {  // Raw string headers
 struct curl_slist *DISC_HEADERS = NULL;  // Header list
 
 
-// STRUCTS
-struct request {  // Request
+// INTERNAL STRUCTS
+struct Request {  // Request
 	char *method;  // GET, POST, etc.
 	char *url;  // URL to send the request to
 	struct curl_slist *headers;  // Headers
 	char *content;  // Request content
 };
 
-struct response {  // Response to a request
+struct Response {  // Response to a request
 	long code;  // Response status code
 	char content[2048];  // Response content
 };
 
+// DISCORD STRUCTS
+struct Application {  // Discord Application object
+	char *id;  // ID of the app
+	char *name;  // Name of the app
+	char *icon;  // Icon has of the app
+	char *description;  // Description of the app
+	char **rpc_origins;  // [TODO] List of RPC origin URLS, if RPC is enabled
+	int bot_public;  // When 0, only the app owner can add the app to guilds
+	int bot_require_code_grant;  // When 1, the app's bot will only join upon completion of the full OAuth2 code grant flow
+	char *bot;  // [TODO make into user object] Partial user object for the bot user associated with the app
+	char *terms_of_service_url;  // URL of the app's Terms of Service
+	char *privacy_policy_url;  // URL of the app's Privacy Policy
+	char *owner;  // [TODO] Partial user object for the owner of the app
+};
 
-// FUNCTIONS
-int init() {  // Initialize bot
 
-	curl_global_init(CURL_GLOBAL_DEFAULT);
-	
-	create_headers(  // Make default headers
-		DISC_HEADERS,
-		DISC_HEADERS_RAW,
-		N_DISC_HEADERS
-		);
 
-	return 0;
-
-}
-
-int start() {
-	return 0;
-}
-
-int stop() {
-
-	curl_slist_free_all(DISC_HEADERS);  // Free disc headers list
-	curl_global_cleanup();  // Global CURL cleanup
-
-	return 0;
-}
-
+// INTERNAL FUNCTIONS
 int create_headers(  // Make header struct from raw strings
 	struct curl_slist *headers,  // Headers list to add to
 	char *headers_raw[], // Array of string headers
@@ -106,7 +95,7 @@ size_t req_callback(  // Callback function for requests
 }
 
 int *set_req(  // Set request struct
-		struct request *req,
+		struct Request *req,
 		char *method,  // GET, POST, etc.
 		char *url,  // Url to send request to
 		struct curl_slist *headers,  // Headers
@@ -123,8 +112,8 @@ int *set_req(  // Set request struct
 }
 
 int send_req(  // Send a request
-	struct request *req,  // Request data
-	struct response *res  // Struct to store response in
+	struct Request *req,  // Request data
+	struct Response *res  // Struct to store response in
 	) {
 
 	CURL *curl = curl_easy_init();  // CURL handle
@@ -200,32 +189,50 @@ int send_req(  // Send a request
 
 }
 
+// DISCORD FUNCTIONS
+int init() {  // Initialize bot
 
-// MAIN
-int main() {
-
-	init();
-
-	struct request *imp = malloc(sizeof(struct request));
-	struct response *result = malloc(sizeof(struct response));
-
-	set_req(imp, "GET", "https://reqres.in/api/users", NULL, NULL);
-	send_req(imp, result);
-	printf("%d %s\n\n", result->code, result->content);
-
-	set_req(imp, "POST", "https://reqres.in/api/users", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
-	send_req(imp, result);
-	printf("%d %s\n\n", result->code, result->content);
-
-	set_req(imp, "PUT", "https://reqres.in/api/users/2", NULL, "{\"name\": \"asdsad\",\"job\": \"leader\"}");
-	send_req(imp, result);
-	printf("%d %s\n\n", result->code, result->content);
-
-	free(imp);
-	free(result);
-
-	stop();
+	curl_global_init(CURL_GLOBAL_DEFAULT);
+	
+	create_headers(  // Make default headers
+		DISC_HEADERS,
+		DISC_HEADERS_RAW,
+		N_DISC_HEADERS
+		);
 
 	return 0;
+
+}
+
+int start() {
+	return 0;
+}
+
+int stop() {
+
+	curl_slist_free_all(DISC_HEADERS);  // Free disc headers list
+	curl_global_cleanup();  // Global CURL cleanup
+
+	return 0;
+}
+
+char *get_current_application() {  // Get info on current application
+
+	struct Request *req = malloc(sizeof(struct Request));  // Create request struct
+	struct Response *res = malloc(sizeof(struct Response));  // Create response struct
+
+	set_req(req, "GET", DISC_BASE_URL "/applications/@me", NULL, NULL);  // Set request
+	send_req(req, res);  // Send request
+
+	//if (res->code == ) {
+
+	char json[2048] = "";
+	printf(res->content);
+	strcpy(json, res->content);
+
+	free(req);
+	free(res);
+
+	//return json;  // TODO change to Application object
 
 }

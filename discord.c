@@ -7,20 +7,12 @@
 
 
 // GLOBALS
-#ifndef DISC_API_KEY  // If API key not defined by user
-	#define DISC_API_KEY "todo_api_key"  // Bot API key
+#ifndef DISC_BASE_URL
+	#define DISC_BASE_URL "https://discord.com/api"  // Base URL for requests
 #endif
-#define DISC_BASE_URL "https://discord.com/api"  // Base URL for requests
-#define DISC_UAGENT_HEADER "User-Agent: DiscordBot (https://google.com, 0)"  // Discord User Agent header
-#define DISC_AUTH_HEADER "Authorization: Bot " DISC_API_KEY  // Auth header
-
-#define N_DISC_HEADERS 3  // Number of discord headers
-char *DISC_HEADERS_RAW[N_DISC_HEADERS] = {  // Raw string headers
-	DISC_UAGENT_HEADER,
-	DISC_AUTH_HEADER,
-	"content-type: application/json"
-};
-struct curl_slist *DISC_HEADERS = NULL;  // Header list
+#ifndef N_DISC_HEADERS
+	#define N_DISC_HEADERS 3
+#endif
 
 
 // INTERNAL STRUCTS
@@ -189,16 +181,38 @@ int send_req(  // Send a request
 
 }
 
+// DISCORD INTERNAL FUNCTIONS
+int create_disc_headers(  // Create headers for discord requests
+		struct curl_slist *headers,  // Headers struct to append to
+		char *api_key  // Discord bot API key
+	) {
+
+	char *uagent = "User-Agent: DiscordBot (https://google.com, 0)";
+	char *auth_start = "Authorization: Bot ";  // TODO add api key
+	char auth[92];
+	strcpy(auth, auth_start);
+	strcat(auth, api_key);
+
+	char *headers_arr[N_DISC_HEADERS] = {  // Raw string headers
+		uagent,
+		auth,
+		"content-type: application/json"
+	};
+
+	create_headers(
+		headers,
+		headers_arr,
+		N_DISC_HEADERS
+		);
+
+	return 0;
+
+}
+
 // DISCORD FUNCTIONS
 int init() {  // Initialize bot
 
 	curl_global_init(CURL_GLOBAL_DEFAULT);
-	
-	create_headers(  // Make default headers
-		DISC_HEADERS,
-		DISC_HEADERS_RAW,
-		N_DISC_HEADERS
-		);
 
 	return 0;
 
@@ -210,13 +224,15 @@ int start() {
 
 int stop() {
 
-	curl_slist_free_all(DISC_HEADERS);  // Free disc headers list
+	//curl_slist_free_all(DISC_HEADERS);  // Free disc headers list
 	curl_global_cleanup();  // Global CURL cleanup
 
 	return 0;
 }
 
-char *get_current_application() {  // Get info on current application
+char *get_current_application(  // [TODO finish] Get info on current application
+	char *api_key  // API key of discord bot
+	) {
 
 	struct Request *req = malloc(sizeof(struct Request));  // Create request struct
 	struct Response *res = malloc(sizeof(struct Response));  // Create response struct
@@ -227,7 +243,6 @@ char *get_current_application() {  // Get info on current application
 	//if (res->code == ) {
 
 	char json[2048] = "";
-	printf(res->content);
 	strcpy(json, res->content);
 
 	free(req);
